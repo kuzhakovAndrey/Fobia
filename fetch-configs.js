@@ -38,6 +38,105 @@ async function fetchText(url) {
   return res.text();
 }
 
+const net = require("net");
+
+const PING_TIMEOUT_MS = 2500;
+const PING_CONCURRENCY = 25;
+
+function pingHost(host, port) {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    const sock = net.connect({ host, port, timeout: PING_TIMEOUT_MS });
+    sock.once("connect", () => {
+      const rtt = Date.now() - t0;
+      sock.destroy();
+      resolve(rtt);
+    });
+    sock.once("timeout", () => {
+      sock.destroy();
+      resolve(null);
+    });
+    sock.once("error", () => resolve(null));
+  });
+}
+
+async function pingAll(targets, concurrency) {
+  const results = new Map();
+  let idx = 0;
+  const workers = Array.from({ length: concurrency }, async () => {
+    while (idx < targets.length) {
+      const i = idx++;
+      const [host, port] = targets[i];
+      const rtt = await pingHost(host, port);
+      if (rtt !== null) results.set(`${host}:${port}`, rtt);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+const CHECK_HOST = "https://check-host.net";
+const MOSCOW_NODES = ["ru1.node.check-host.net", "ru2.node.check-host.net"];
+const MOSCOW_POLL_MS = 2000;
+const MOSCOW_MAX_POLLS = 8;
+const MOSCOW_DELAY_MS = 1000;
+const REQ_TIMEOUT_MS = 12000;
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function fetchJson(url) {
+  const res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(REQ_TIMEOUT_MS) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function checkHostTcp(host, port) {
+  const q = `host=${encodeURIComponent(`${host}:${port}`)}&node=${MOSCOW_NODES.join("&node=")}`;
+  const data = await fetchJson(`${CHECK_HOST}/check-tcp?${q}`);
+  if (!data.ok) throw new Error("запрос отклонён");
+  const rid = data.request_id;
+  for (let i = 0; i < MOSCOW_MAX_POLLS; i++) {
+    await sleep(MOSCOW_POLL_MS);
+    const results = await fetchJson(`${CHECK_HOST}/check-result/${rid}`);
+    const times = [];
+    let failed = false;
+    for (const node of MOSCOW_NODES) {
+      const r = results[node];
+      if (r === null) continue;
+      const first = Array.isArray(r) ? r[0] : r;
+      if (first && first.time != null) times.push(first.time * 1000);
+      else if (first && first.error) failed = true;
+    }
+    if (times.length) return { ok: true, rtt: Math.round(times.reduce((a, b) => a + b, 0) / times.length) };
+    if (failed) return { ok: false };
+  }
+  return null;
+}
+
+async function pingMoscow(targets) {
+  const results = new Map();
+  let failures = 0;
+  for (const [host, port] of targets) {
+    try {
+      const r = await checkHostTcp(host, port);
+      if (r && r.ok) results.set(`${host}:${port}`, { moscow: r.rtt });
+      else if (r && !r.ok) results.set(`${host}:${port}`, { moscow: null });
+      else results.set(`${host}:${port}`, { moscow: null });
+      failures = 0;
+    } catch (e) {
+      failures++;
+      if (failures >= 5) {
+        console.log(`check-host.net недоступен (${e.message}), останавливаю московские проверки`);
+        break;
+      }
+    }
+    await sleep(MOSCOW_DELAY_MS);
+  }
+  return results;
+}
+
 async function main() {
   const unique = new Set();
   const sources = [];
@@ -67,6 +166,32 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "all.txt"), all.join("\n") + "\n");
   fs.writeFileSync(path.join(outDir, "hysteria2.txt"), h2.join("\n") + "\n");
+
+  console.log(`Пинг ${h2.length} hysteria2 серверов (TCP, из GitHub Actions)...`);
+  const targets = [];
+  for (const l of h2) {
+    try {
+      const u = new URL(l);
+      targets.push([u.hostname, Number(u.port) || 443]);
+    } catch {}
+  }
+  const uniqueTargets = Array.from(new Map(targets.map((t) => [t.join(":"), t])).values());
+  const limit = Number(process.env.PING_LIMIT) || uniqueTargets.length;
+  const limitedTargets = uniqueTargets.slice(0, limit);
+  const pingMap = await pingAll(limitedTargets, PING_CONCURRENCY);
+  console.log(`TCP-пинг (GitHub): ${pingMap.size} из ${limitedTargets.length} серверов`);
+  console.log(`Проверяю ${limitedTargets.length} серверов с узлов Москвы (check-host.net)...`);
+  const moscowMap = await pingMoscow(limitedTargets);
+  const merged = {};
+  for (const [key, rtt] of pingMap) {
+    merged[key] = { server: rtt, moscow: moscowMap.get(key)?.moscow ?? null };
+  }
+  for (const [key, v] of moscowMap) {
+    if (!merged[key]) merged[key] = { server: null, moscow: v.moscow };
+  }
+  fs.writeFileSync(path.join(outDir, "ping.json"), JSON.stringify(merged, null, 2));
+  const moscowOk = Object.values(merged).filter((v) => v.moscow != null).length;
+  console.log(`Пинг от Москвы получен для ${moscowOk} из ${limitedTargets.length} серверов`);
 
   const meta = {
     updated: new Date().toISOString(),

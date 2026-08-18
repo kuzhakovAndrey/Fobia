@@ -55,10 +55,15 @@
       <div class="output-header">
         <h2>Результат <span id="result-label">— только hysteria2</span></h2>
         <div class="output-actions">
+          <select id="sort" class="select">
+            <option value="default">Сортировка: по умолчанию</option>
+            <option value="ping">Сортировка: по пингу (Москва)</option>
+          </select>
           <button id="btn-copy-all" class="btn primary">Копировать все</button>
           <button id="btn-download" class="btn ghost">Скачать .txt</button>
         </div>
       </div>
+      <p class="hint">Пинг измеряется с узлов <b>Москвы</b> (check-host.net, TCP, каждые 6 часов). «Недоступен» — сервер не отвечает из РФ.</p>
       <div id="result" class="result-list"></div>
       <div id="empty" class="empty hidden">
         <p>Пока пусто. Вставь конфиги выше или загрузи подписку — hysteria2 появится здесь мгновенно.</p>

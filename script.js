@@ -17,6 +17,7 @@
     statShown: $("stat-shown"),
     btnCopyAll: $("btn-copy-all"),
     btnDownload: $("btn-download"),
+    sort: $("sort"),
     toast: $("toast"),
     sources: $("sources"),
     sourcesStatus: $("sources-status"),
@@ -26,6 +27,8 @@
   let allConfigs = [];
   let hysteria2 = [];
   let metaTotal = 0;
+  let pingMap = {};
+  let sortMode = "default";
 
   function extractLinks(text) {
     const links = [];
@@ -58,10 +61,14 @@
 
   function render() {
     const search = els.search.value.trim().toLowerCase();
-    const h2Items = hysteria2.map(parseHysteria2);
-    const filtered = search
-      ? h2Items.filter((c) => (c.name + " " + c.host + " " + c.port).toLowerCase().includes(search))
-      : h2Items;
+    let h2Items = hysteria2.map(parseHysteria2).map((c) => {
+      const p = pingMap[`${c.host}:${c.port}`];
+      c.moscow = p ? p.moscow : null;
+      return c;
+    });
+    if (search) h2Items = h2Items.filter((c) => (c.name + " " + c.host + " " + c.port).toLowerCase().includes(search));
+    if (sortMode === "ping") h2Items.sort((a, b) => (a.moscow ?? 1e9) - (b.moscow ?? 1e9));
+    const filtered = h2Items;
 
     els.statTotal.textContent = metaTotal || allConfigs.length;
     els.statH2.textContent = hysteria2.length;
@@ -93,7 +100,16 @@
         copy.className = "copy-btn";
         copy.textContent = "Копировать";
         copy.addEventListener("click", () => copyText(c.link, "Конфиг скопирован"));
-        item.append(proto, link, copy);
+        const ping = document.createElement("span");
+        ping.className = "ping-badge";
+        if (c.moscow != null) {
+          ping.textContent = `Мск: ${c.moscow} мс`;
+          ping.classList.add(c.moscow < 100 ? "fast" : c.moscow < 300 ? "mid" : "slow");
+        } else {
+          ping.textContent = "Мск: недоступен";
+          ping.classList.add("down");
+        }
+        item.append(proto, link, ping, copy);
         frag.appendChild(item);
       }
       els.result.appendChild(frag);
@@ -132,14 +148,16 @@
 
   async function loadLocal() {
     try {
-      const [metaRes, h2Res] = await Promise.all([
+      const [metaRes, h2Res, pingRes] = await Promise.all([
         fetch("configs/sources.json"),
         fetch("configs/hysteria2.txt"),
+        fetch("configs/ping.json"),
       ]);
       if (!metaRes.ok || !h2Res.ok) throw new Error("файлы конфигов не найдены");
       const meta = await metaRes.json();
       metaTotal = meta.total;
       hysteria2 = extractLinks(await h2Res.text());
+      if (pingRes.ok) pingMap = await pingRes.json();
       renderSources(meta);
       render();
     } catch (e) {
@@ -192,6 +210,10 @@
   });
 
   els.search.addEventListener("input", render);
+  els.sort.addEventListener("change", () => {
+    sortMode = els.sort.value;
+    render();
+  });
   els.btnClear.addEventListener("click", () => {
     els.configs.value = "";
     els.search.value = "";

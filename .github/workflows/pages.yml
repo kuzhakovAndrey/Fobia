@@ -2,6 +2,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,10 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - name: Build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fetch configs from 7 sources
         run: |
+          node fetch-configs.js
           mkdir -p _site
           cp index.html style.css script.js _site/
+          cp -r configs _site/configs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

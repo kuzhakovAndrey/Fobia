@@ -36,9 +36,11 @@
 
     <section class="panel" id="sources-panel">
       <div class="output-header">
-        <h2>Автоисточники <span id="sources-status" class="muted"></span></h2>
-        <button id="btn-refresh" class="btn primary">Обновить источники</button>
+        <h2>Автоисточники <span id="updated" class="muted"></span></h2>
+        <button id="btn-refresh" class="btn primary">Перезагрузить</button>
       </div>
+      <p class="hint">Конфиги собираются на серверах GitHub каждые 6 часов и отдаются прямо с этого сайта — без блокировок и CORS.</p>
+      <div id="sources-status" class="sources-status-line"></div>
       <div id="sources" class="sources-list"></div>
     </section>
 

@@ -123,6 +123,7 @@ textarea { resize: vertical; min-height: 130px; }
 .source-status.ok { color: var(--ok); }
 .source-status.err { color: var(--danger); }
 .muted { color: var(--muted); font-size: 12px; font-weight: 400; }
+.sources-status-line { color: var(--text); font-size: 14px; font-weight: 600; margin-bottom: 10px; }
 
 .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
 .stat {

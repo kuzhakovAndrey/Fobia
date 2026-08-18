@@ -162,10 +162,25 @@ async function main() {
 
   const all = Array.from(unique);
   const h2 = all.filter((l) => l.startsWith("hysteria2://"));
+  const REALITY_RE = /\?[^#]*\bsecurity=reality/;
+  const mobile = all.filter((l) => /^(hysteria2|trojan):\/\//.test(l) || (/^vless:\/\//.test(l) && REALITY_RE.test(l)));
+  const caveat = all.filter((l) => /^(ss|vmess|tuic):\/\//.test(l));
   const outDir = process.env.OUT_DIR || "configs";
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "all.txt"), all.join("\n") + "\n");
   fs.writeFileSync(path.join(outDir, "hysteria2.txt"), h2.join("\n") + "\n");
+  fs.writeFileSync(path.join(outDir, "mobile.txt"), mobile.join("\n") + "\n");
+  fs.writeFileSync(path.join(outDir, "caveat.txt"), caveat.join("\n") + "\n");
+  const protocols = {
+    total: all.length,
+    mobile: mobile.length,
+    hysteria2: h2.length,
+    trojan: all.filter((l) => l.startsWith("trojan://")).length,
+    vlessReality: mobile.filter((l) => l.startsWith("vless://")).length,
+    vless: all.filter((l) => l.startsWith("vless://")).length,
+    caveat: caveat.length,
+  };
+  console.log(`Мобильные (vless-reality+trojan+h2): ${mobile.length}, прочие: ${caveat.length}`);
 
   console.log(`Пинг ${h2.length} hysteria2 серверов (TCP, из GitHub Actions)...`);
   const targets = [];
@@ -197,6 +212,9 @@ async function main() {
     updated: new Date().toISOString(),
     total: all.length,
     hysteria2: h2.length,
+    mobile: mobile.length,
+    caveat: caveat.length,
+    protocols,
     sources,
   };
   fs.writeFileSync(path.join(outDir, "sources.json"), JSON.stringify(meta, null, 2));

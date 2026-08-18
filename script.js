@@ -12,23 +12,28 @@
     result: $("result"),
     empty: $("empty"),
     statTotal: $("stat-total"),
+    statMobile: $("stat-mobile"),
     statH2: $("stat-h2"),
-    statOther: $("stat-other"),
     statShown: $("stat-shown"),
     btnCopyAll: $("btn-copy-all"),
     btnDownload: $("btn-download"),
-    sort: $("sort"),
     toast: $("toast"),
     sources: $("sources"),
     sourcesStatus: $("sources-status"),
     updated: $("updated"),
+    sort: $("sort"),
+    protoFilter: $("proto-filter"),
   };
 
-  let allConfigs = [];
   let hysteria2 = [];
   let metaTotal = 0;
+  let metaMobile = 0;
+  let metaCaveat = 0;
   let pingMap = {};
   let sortMode = "default";
+  let filter = "hysteria2";
+  let currentList = [];
+  const cache = {};
 
   function extractLinks(text) {
     const links = [];
@@ -40,76 +45,76 @@
     return links;
   }
 
-  function parseHysteria2(link) {
+  function protoInfo(link) {
+    if (link.startsWith("hysteria2://")) return { label: "hysteria2", mobile: true };
+    if (link.startsWith("trojan://")) return { label: "trojan", mobile: true };
+    if (link.startsWith("vless://")) return { label: "vless+Reality", mobile: true };
+    if (link.startsWith("ss://")) return { label: "ss", mobile: false };
+    if (link.startsWith("vmess://")) return { label: "vmess", mobile: false };
+    if (link.startsWith("tuic://")) return { label: "tuic", mobile: false };
+    return { label: "?", mobile: false };
+  }
+
+  function parseItem(link) {
+    const proto = protoInfo(link);
+    let host = "?", port = "", name = proto.label;
     try {
-      const u = new URL(link);
+      const u = new URL(link.replace("ss://", "https://").replace("vmess://", "https://"));
+      if (proto.label === "hysteria2" || proto.label === "trojan" || proto.label === "vless+Reality") {
+        host = u.hostname;
+        port = u.port || "";
+      }
       const frag = u.hash ? decodeURIComponent(u.hash.slice(1)) : "";
-      const name = frag || u.host || "hysteria2";
-      return {
-        name,
-        host: u.hostname,
-        port: u.port || "443",
-        sni: u.searchParams.get("sni") || u.hostname,
-        insecure: u.searchParams.get("insecure") === "1",
-        obfs: u.searchParams.get("obfs") || "",
-        link,
-      };
-    } catch {
-      return { name: "hysteria2", host: "?", port: "?", link };
-    }
+      if (frag) name = frag;
+    } catch {}
+    const p = pingMap[`${host}:${port}`];
+    return { proto, host, port, name, link, moscow: p ? p.moscow : null };
   }
 
   function render() {
     const search = els.search.value.trim().toLowerCase();
-    let h2Items = hysteria2.map(parseHysteria2).map((c) => {
-      const p = pingMap[`${c.host}:${c.port}`];
-      c.moscow = p ? p.moscow : null;
-      return c;
-    });
-    if (search) h2Items = h2Items.filter((c) => (c.name + " " + c.host + " " + c.port).toLowerCase().includes(search));
-    if (sortMode === "ping") h2Items.sort((a, b) => (a.moscow ?? 1e9) - (b.moscow ?? 1e9));
-    const filtered = h2Items;
+    let items = currentList.map(parseItem);
+    if (search) items = items.filter((c) => (c.name + " " + c.host + " " + c.port).toLowerCase().includes(search));
+    if (sortMode === "ping") items.sort((a, b) => (a.moscow ?? 1e9) - (b.moscow ?? 1e9));
 
-    els.statTotal.textContent = metaTotal || allConfigs.length;
+    els.statTotal.textContent = metaTotal || currentList.length;
+    els.statMobile.textContent = metaMobile || currentList.filter((l) => protoInfo(l).mobile).length;
     els.statH2.textContent = hysteria2.length;
-    els.statOther.textContent = (metaTotal || allConfigs.length) - hysteria2.length;
-    els.statShown.textContent = filtered.length;
+    els.statShown.textContent = items.length;
 
     els.result.innerHTML = "";
-    if (filtered.length === 0) {
+    if (items.length === 0) {
       els.empty.classList.remove("hidden");
     } else {
       els.empty.classList.add("hidden");
       const frag = document.createDocumentFragment();
-      for (const c of filtered) {
+      for (const c of items) {
         const item = document.createElement("div");
         item.className = "config-item";
         const proto = document.createElement("span");
-        proto.className = "proto";
-        proto.textContent = "hysteria2";
+        proto.className = "proto-badge " + (c.proto.mobile ? "mobile" : "warn");
+        proto.textContent = (c.proto.mobile ? "✅ " : "⚠️ ") + c.proto.label;
         const link = document.createElement("span");
         link.className = "link";
         const name = document.createElement("span");
         name.className = "name";
         name.textContent = c.name;
         const host = document.createElement("span");
-        host.textContent = ` ${c.host}:${c.port}`;
-        if (c.obfs) host.textContent += ` (obfs:${c.obfs})`;
+        host.textContent = c.host === "?" ? "" : ` ${c.host}${c.port ? ":" + c.port : ""}`;
         link.append(name, host);
+        let ping = null;
+        if (c.moscow != null) {
+          ping = document.createElement("span");
+          ping.className = "ping-badge " + (c.moscow < 100 ? "fast" : c.moscow < 300 ? "mid" : "slow");
+          ping.textContent = `Мск: ${c.moscow} мс`;
+        }
         const copy = document.createElement("button");
         copy.className = "copy-btn";
         copy.textContent = "Копировать";
         copy.addEventListener("click", () => copyText(c.link, "Конфиг скопирован"));
-        const ping = document.createElement("span");
-        ping.className = "ping-badge";
-        if (c.moscow != null) {
-          ping.textContent = `Мск: ${c.moscow} мс`;
-          ping.classList.add(c.moscow < 100 ? "fast" : c.moscow < 300 ? "mid" : "slow");
-        } else {
-          ping.textContent = "Мск: недоступен";
-          ping.classList.add("down");
-        }
-        item.append(proto, link, ping, copy);
+        item.append(proto, link);
+        if (ping) item.append(ping);
+        item.append(copy);
         frag.appendChild(item);
       }
       els.result.appendChild(frag);
@@ -146,6 +151,29 @@
     els.updated.textContent = `Обновлено: ${new Date(meta.updated).toLocaleString("ru-RU")}`;
   }
 
+  async function loadList(filterName) {
+    if (filterName === "hysteria2") return hysteria2;
+    const key = filterName === "caveat" ? "caveat" : "mobile";
+    if (cache[key] === undefined) {
+      const res = await fetch(`configs/${key}.txt`);
+      if (!res.ok) throw new Error(`не удалось загрузить ${key}.txt`);
+      cache[key] = extractLinks(await res.text());
+    }
+    let links = cache[key];
+    if (filterName === "vless") links = links.filter((l) => l.startsWith("vless://"));
+    if (filterName === "trojan") links = links.filter((l) => l.startsWith("trojan://"));
+    return links;
+  }
+
+  async function applyFilter() {
+    try {
+      currentList = await loadList(filter);
+      render();
+    } catch (e) {
+      toast("Ошибка: " + e.message, true);
+    }
+  }
+
   async function loadLocal() {
     try {
       const [metaRes, h2Res, pingRes] = await Promise.all([
@@ -156,10 +184,12 @@
       if (!metaRes.ok || !h2Res.ok) throw new Error("файлы конфигов не найдены");
       const meta = await metaRes.json();
       metaTotal = meta.total;
+      metaMobile = meta.mobile || 0;
+      metaCaveat = meta.caveat || 0;
       hysteria2 = extractLinks(await h2Res.text());
       if (pingRes.ok) pingMap = await pingRes.json();
       renderSources(meta);
-      render();
+      await applyFilter();
     } catch (e) {
       els.sourcesStatus.textContent = "Ошибка загрузки: " + e.message;
       els.updated.textContent = "";
@@ -202,14 +232,17 @@
   els.configs.addEventListener("input", () => {
     const links = extractLinks(els.configs.value);
     if (links.length) {
-      allConfigs = links;
-      hysteria2 = links.filter((l) => l.startsWith("hysteria2://"));
-      els.statTotal.textContent = allConfigs.length;
+      currentList = links;
+      metaTotal = 0;
       render();
     }
   });
 
   els.search.addEventListener("input", render);
+  els.protoFilter.addEventListener("change", () => {
+    filter = els.protoFilter.value;
+    applyFilter();
+  });
   els.sort.addEventListener("change", () => {
     sortMode = els.sort.value;
     render();
@@ -233,10 +266,11 @@
       const text = await fetchWithFallback(url);
       const links = extractLinks(text);
       if (!links.length) throw new Error("нет конфигов");
-      allConfigs = links;
-      hysteria2 = links.filter((l) => l.startsWith("hysteria2://"));
+      currentList = links;
+      metaTotal = 0;
       render();
-      toast(`Загружено: ${links.length} конфигов, ${hysteria2.length} hysteria2`);
+      const h2n = links.filter((l) => l.startsWith("hysteria2://")).length;
+      toast(`Загружено: ${links.length} конфигов, ${h2n} hysteria2`);
     } catch (e) {
       toast("Ошибка загрузки подписки: " + e.message, true);
     } finally {
@@ -248,22 +282,22 @@
   els.btnRefresh.addEventListener("click", loadLocal);
 
   els.btnCopyAll.addEventListener("click", () => {
-    if (!hysteria2.length) {
-      toast("Нет hysteria2 конфигов", true);
+    if (!currentList.length) {
+      toast("Нет конфигов", true);
       return;
     }
-    copyText(hysteria2.join("\n"), `Скопировано: ${hysteria2.length} конфигов`);
+    copyText(currentList.join("\n"), `Скопировано: ${currentList.length} конфигов`);
   });
 
   els.btnDownload.addEventListener("click", () => {
-    if (!hysteria2.length) {
-      toast("Нет hysteria2 конфигов", true);
+    if (!currentList.length) {
+      toast("Нет конфигов", true);
       return;
     }
-    const blob = new Blob([hysteria2.join("\n")], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob([currentList.join("\n")], { type: "text/plain;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "hysteria2-configs.txt";
+    a.download = "configs.txt";
     a.click();
     URL.revokeObjectURL(a.href);
   });

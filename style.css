@@ -168,6 +168,16 @@ textarea { resize: vertical; min-height: 130px; }
   word-break: break-all;
 }
 .config-item .proto { color: var(--ok); font-weight: 700; flex-shrink: 0; }
+.proto-badge {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.proto-badge.mobile { background: rgba(46, 164, 79, .12); color: #4dd97a; border: 1px solid rgba(46, 164, 79, .35); }
+.proto-badge.warn { background: rgba(255, 186, 0, .1); color: #ffc94d; border: 1px solid rgba(255, 186, 0, .3); }
 .config-item .link { flex: 1; color: var(--muted); }
 .config-item .name { color: var(--text); }
 .select {

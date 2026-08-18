@@ -103,6 +103,27 @@ textarea { resize: vertical; min-height: 130px; }
 .btn.ghost:hover { border-color: var(--accent); color: var(--accent); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
+.hint { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+
+.sources-list { display: flex; flex-direction: column; gap: 6px; }
+.source-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.source-name { color: var(--text); font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; }
+.source-status { color: var(--muted); font-size: 12.5px; }
+.source-status.ok { color: var(--ok); }
+.source-status.err { color: var(--danger); }
+.muted { color: var(--muted); font-size: 12px; font-weight: 400; }
+
 .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
 .stat {
   flex: 1;

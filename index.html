@@ -15,8 +15,9 @@
 
   <main>
     <section class="panel" id="input-panel">
+      <p class="hint">Конфиги с источников ниже подтягиваются автоматически. Сюда можно добавить свою подписку или вставить конфиги вручную.</p>
       <div class="row">
-        <label for="sub-url">Ссылка на подписку:</label>
+        <label for="sub-url">Ссылка на подписку (дополнительно):</label>
         <div class="url-row">
           <input type="url" id="sub-url" placeholder="https://raw.githubusercontent.com/... (vless/vmess/ss/trojan/hysteria2)" spellcheck="false">
           <button id="btn-fetch" class="btn primary">Загрузить</button>
@@ -31,6 +32,14 @@
         <input type="text" id="search" placeholder="например: RU, Москва, 1.2.3.4..." spellcheck="false">
         <button id="btn-clear" class="btn ghost">Очистить</button>
       </div>
+    </section>
+
+    <section class="panel" id="sources-panel">
+      <div class="output-header">
+        <h2>Автоисточники <span id="sources-status" class="muted"></span></h2>
+        <button id="btn-refresh" class="btn primary">Обновить источники</button>
+      </div>
+      <div id="sources" class="sources-list"></div>
     </section>
 
     <section class="stats" id="stats">

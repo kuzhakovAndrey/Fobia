@@ -281,6 +281,12 @@ const CITY_MAP = {
   buenosaires: 'ar', mexico: 'mx', mexicocity: 'mx', bogota: 'co', lima: 'pe', santiago: 'cl',
   johannesburg: 'za', lagos: 'ng', nairobi: 'ke',
   telaviv: 'il', 'tel aviv': 'il',
+  japan: 'jp', germany: 'de', netherlands: 'nl', holland: 'nl', usa: 'us', america: 'us',
+  russia: 'ru', poland: 'pl', turkey: 'tr', ukraine: 'ua', brazil: 'br', canada: 'ca',
+  australia: 'au', india: 'in', china: 'cn', korea: 'kr', britain: 'gb', england: 'gb',
+  france: 'fr', spain: 'es', italy: 'it', switzerland: 'ch', austria: 'at', sweden: 'se',
+  finland: 'fi', norway: 'no', denmark: 'dk', vietnam: 'vn', malaysia: 'my', indonesia: 'id',
+  philippines: 'ph', thailand: 'th', argentina: 'ar', mexico: 'mx', chile: 'cl',
   beijing: 'cn', shanghai: 'cn', guangzhou: 'cn', shenzhen: 'cn', chengdu: 'cn', hangzhou: 'cn',
   kualalumpur: 'my', kuala: 'my',
   tehran: 'ir', riga: 'lv', vilnius: 'lt', tallinn: 'ee', kyiv: 'ua', kiev: 'ua', minsk: 'by',
@@ -307,6 +313,8 @@ function hostnameCountryHint(host) {
   }
   const m = h.match(/\.([a-z]{2})$/);
   if (m && TLD_MAP[m[1]] && m[1] !== 'us') return TLD_MAP[m[1]];
+  const cc = h.match(/(?:^|[\-._])(de|nl|pl|fr|jp|uk|us|ru|sg|hk|tw|kr|se|fi|no|dk|ca|au|it|es|pt|cz|tr|br|za|il|th|vn|id|my|ph|in|gb)(?:\d+)?(?:[\-._]|$)/);
+  if (cc && TLD_MAP[cc[1]]) return TLD_MAP[cc[1]];
   return null;
 }
 
@@ -716,8 +724,7 @@ function execFileSync_(cmd, args) {
   for (const c of finalList) {
     if (!c.country) c.country = '??';
     const hint = hostnameCountryHint(c.host);
-    if (hint && (c.country === 'us' || c.country === '??')) c.country = hint;
-    if (hint && c.country === 'us') c.country = hint;
+    if (hint) c.country = hint;
   }
 
   // build data.json

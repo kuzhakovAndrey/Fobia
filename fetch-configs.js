@@ -128,8 +128,20 @@ function parseSS(rest) {
     b64 = b;
     const h = splitHostPort(hp);
     host = h[0]; port = h[1];
+    // vless-style ss:// links (uuid@host:port?security=reality/tls&flow=xtls-rprx-vision...)
+    // used by some pools: ss:// prefix, but actually a vless config
+    const dec0 = decodeB64(b64);
+    if (!dec0.includes(':') && !b64.includes(':')) {
+      const c = parseVless(rest);
+      if (c) { c.protocol = 'vless'; return c; }
+    }
   } else {
     const dec = decodeB64(body);
+    if (dec.trimStart().startsWith('{')) {
+      // vmess JSON disguised as ss:// link
+      const c = parseVmess(rest);
+      if (c) { c.protocol = 'vmess'; return c; }
+    }
     const at = dec.lastIndexOf('@');
     if (at < 0) return null;
     b64 = dec.slice(0, at);
@@ -137,7 +149,19 @@ function parseSS(rest) {
     host = h[0]; port = h[1];
   }
   if (!host || !port) return null;
-  let mp = decodeB64(b64);
+  let mp = null;
+  {
+    const dec = decodeB64(b64);
+    if (dec.includes(':')) mp = dec;
+    else {
+      const ci = b64.indexOf(':');
+      if (ci > 0) {
+        const mDec = decodeB64(b64.slice(0, ci));
+        if (/^[a-z0-9-]+$/i.test(mDec)) mp = mDec + b64.slice(ci);
+      }
+      if (!mp && b64.includes(':')) mp = b64;
+    }
+  }
   const ci = mp.indexOf(':');
   if (ci < 0) return null;
   const method = mp.slice(0, ci);
@@ -655,6 +679,21 @@ function execFileSync_(cmd, args) {
   }
   const configs = [...byNode.values()];
   console.log(`[dedup] by node: ${configs.length}`);
+
+  if (process.env.PARSE_ONLY === '1') {
+    // audit: why did raw links fail to parse?
+    const parsedKeys = new Set(parsed.map((c) => c.raw));
+    const unparsed = allRaw.filter((r) => !parsedKeys.has(r.link));
+    const schemeCount = {};
+    for (const r of unparsed) {
+      const s = (r.link.match(/^(vless|vmess|ss|trojan|tuic|hysteria2|hy2)/) || [])[1];
+      schemeCount[s] = (schemeCount[s] || 0) + 1;
+    }
+    console.log(`[audit] unparsed: ${unparsed.length}, by scheme: ${JSON.stringify(schemeCount)}`);
+    console.log('[audit] unparsed samples:');
+    for (const r of unparsed.slice(0, 10)) console.log('   ', r.link.slice(0, 130));
+    process.exit(0);
+  }
 
   // resolve ips + geo
   console.log('[geo] resolving IPs...');

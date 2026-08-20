@@ -94,6 +94,13 @@ const flag=cc=>{let c=cc.toUpperCase();return String.fromCodePoint(...[...c].map
 const $=s=>document.querySelector(s);
 let DATA=null,flat=[],activeProto='all',searchVal='',sortMode='rtt';
 const esc=s=>s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const LINK_GROUPS={};
+let groupSeq=0;
+function makeGroup(links){const k='g'+(++groupSeq);LINK_GROUPS[k]=links.join('\n');return k}
+function copyGroupBtn(links,label){
+  const k=makeGroup(links);
+  return '<div class="tabbar"><span class="t">'+label+'</span><button class="cp" data-links="'+k+'">копировать все</button></div>';
+}
 
 function serviceBadges(sv){
   if(!sv)return '<span class="sv"></span>';
@@ -140,12 +147,10 @@ function ensureCountry(cc,section){
   const chosen=activeProto==='all'?PROTOCOLS.find(p=>g[p]&&g[p].length):activeProto;
   if(chosen&&g[chosen]){
     renderRows(body,configsFor(cc,chosen),false);
-    const count=g[chosen].length;
-    const tb=document.createElement('div');tb.className='tabbar';
-    tb.innerHTML='<span class="t">'+chosen+' · '+count+'</span><button class="cp" data-links="'+esc(g[chosen].map(x=>x.link).join('\n'))+'">копировать все</button>';
-    body.insertBefore(tb,body.firstChild);
+    body.insertBefore(htmlEl(copyGroupBtn(g[chosen].map(x=>x.link),chosen+' · '+g[chosen].length)),body.firstChild);
   }
 }
+function htmlEl(html){const d=document.createElement('div');d.innerHTML=html;return d.firstChild}
 function renderCountries(filtered){
   const list=$('#list');list.innerHTML='';
   const entries=Object.entries(DATA.countries).sort((a,b)=>{
@@ -222,9 +227,8 @@ document.addEventListener('click',e=>{
     sec.querySelectorAll('.ptab').forEach(x=>x.classList.remove('on'));
     cp.classList.add('on');cp.style.setProperty('--dot',PROTO_COLOR[cp.dataset.p]);
     renderRows(rows,configsFor(cc,cp.dataset.p),false);
-    const tb=document.createElement('div');tb.className='tabbar';tb.innerHTML='<span class="t">'+cp.dataset.p+' · '+g[cp.dataset.p].length+'</span><button class="cp" data-links="'+esc(g[cp.dataset.p].map(x=>x.link).join('\n'))+'">копировать все</button>';
-    rows.insertBefore(tb,rows.firstChild);return}
-  const ca=e.target.closest('.cp');if(ca)copyText(ca.dataset.links,ca);
+    rows.insertBefore(htmlEl(copyGroupBtn(g[cp.dataset.p].map(x=>x.link),cp.dataset.p+' · '+g[cp.dataset.p].length)),rows.firstChild);return}
+  const ca=e.target.closest('.cp');if(ca)copyText(LINK_GROUPS[ca.dataset.links]||'',ca);
 });
 $('#search').addEventListener('input',e=>{
   clearTimeout($('#search')._t);
@@ -234,7 +238,7 @@ $('#search').addEventListener('input',e=>{
 });
 $('#sort').addEventListener('change',e=>{sortMode=e.target.value;
   if(searchVal){showFlat(searchFlat(searchVal));return}
-  for(const sec of document.querySelectorAll('#list section.country')){const rows=sec.querySelector('.rows');if(rows&&rows.children.length>1){const cc=sec.id.slice(2);const pt=rows.querySelector('.tabbar .t');const p=pt?pt.textContent.split('·')[0].trim():null;if(p){rows.innerHTML='';renderRows(rows,configsFor(cc,p),false);const tb=document.createElement('div');tb.className='tabbar';tb.innerHTML='<span class="t">'+p+' · '+DATA.countries[cc][p].length+'</span><button class="cp" data-links="'+esc(DATA.countries[cc][p].map(x=>x.link).join('\n'))+'">копировать все</button>';rows.insertBefore(tb,rows.firstChild)}}}
+  for(const sec of document.querySelectorAll('#list section.country')){const rows=sec.querySelector('.rows');if(rows&&rows.children.length>1){const cc=sec.id.slice(2);const pt=rows.querySelector('.tabbar .t');const p=pt?pt.textContent.split('·')[0].trim():null;if(p){rows.innerHTML='';renderRows(rows,configsFor(cc,p),false);rows.insertBefore(htmlEl(copyGroupBtn(DATA.countries[cc][p].map(x=>x.link),p+' · '+DATA.countries[cc][p].length)),rows.firstChild)}}}
 });
 (async()=>{
   const res=await fetch('data.json',{cache:'no-cache'});

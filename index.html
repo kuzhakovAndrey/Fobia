@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Fobia VPN — конфиги для Google</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0b0f14;--card:#11161d;--line:#1d2530;--tx:#e6edf3;--mut:#8b98a5;--acc:#4ade80;--red:#f87171;--yel:#fbbf24}
+html{color-scheme:dark}
+body{background:var(--bg);color:var(--tx);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:40px}
+a{color:var(--acc)}
+header{position:sticky;top:0;z-index:10;background:rgba(11,15,20,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 14px}
+.hdr{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+h1{font-size:18px;font-weight:700;letter-spacing:.3px}
+h1 small{display:block;font-size:11px;font-weight:400;color:var(--mut)}
+#stats{font-size:11px;color:var(--mut);display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+#stats b{color:var(--tx)}
+.ctrl{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+#search{flex:1;min-width:180px;background:#0d131a;border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:7px 10px;font-size:13px;outline:none}
+#search:focus{border-color:var(--acc)}
+#sort{background:#0d131a;border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:7px 8px;font-size:12px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chip{border:1px solid var(--line);background:#0d131a;color:var(--mut);border-radius:999px;padding:4px 11px;font-size:12px;cursor:pointer;user-select:none;transition:.15s}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#062c17}
+.chip .c{opacity:.75;font-size:11px}
+main{max-width:980px;margin:0 auto;padding:14px}
+section.country{content-visibility:auto;contain-intrinsic-size:auto 52px;background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+summary{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary .flag{font-size:22px;line-height:1}
+summary .nm{font-weight:600;font-size:15px}
+summary .cc{font-size:11px;color:var(--mut)}
+summary .cnt{margin-left:auto;font-size:12px;color:var(--mut);background:#0d131a;border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+summary .arr{color:var(--mut);transition:.2s;font-size:12px}
+details[open] summary .arr{transform:rotate(90deg)}
+.ptabs{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 10px}
+.ptab{border:1px solid var(--line);background:#0d131a;color:var(--mut);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;display:flex;gap:5px;align-items:center}
+.ptab.on{color:var(--tx);border-color:var(--dot)}
+.ptab .pc{font-size:11px;opacity:.8}
+.gbody{padding:0 14px 12px}
+.tabbar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.tabbar .t{font-size:13px;font-weight:600}
+.tabbar .cp{margin-left:auto;font-size:11px;color:var(--mut);background:#0d131a;border:1px solid var(--line);border-radius:6px;padding:3px 8px;cursor:pointer}
+.rows{display:flex;flex-direction:column;gap:6px}
+.row{display:flex;align-items:center;gap:8px;background:#0d131a;border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+.row .proto{flex:none;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border-radius:4px;padding:2px 6px;width:58px;text-align:center}
+.row .host{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
+.row .host small{display:block;color:var(--mut);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sv{display:flex;gap:3px;flex:none}
+.sv i{width:17px;height:17px;border-radius:4px;font-style:normal;font-size:9px;display:flex;align-items:center;justify-content:center;background:#1a2330;color:#4b5b6b}
+.sv i.ok{background:#123c2a;color:#4ade80}
+.sv i.no{background:#3a1d1d;color:#f87171}
+.ping{flex:none;font-size:11.5px;min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
+.ping.f{color:var(--acc)}.ping.m{color:var(--yel)}.ping.s{color:var(--red)}.ping.u{color:var(--mut)}
+.speed{flex:none;font-size:11.5px;min-width:52px;text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
+.cpbtn{flex:none;border:1px solid var(--line);background:#11181f;color:var(--tx);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer;transition:.15s}
+.cpbtn.ok{background:#123c2a;border-color:#2f7a52;color:#4ade80}
+.empty{padding:20px;text-align:center;color:var(--mut);font-size:13px}
+#flat{display:none}
+#flat.show{display:block}
+.pbar{height:3px;background:var(--acc);border-radius:2px;margin-top:6px;transition:width .2s}
+footer{max-width:980px;margin:20px auto 0;padding:0 14px;color:var(--mut);font-size:11px;text-align:center}
+@media(max-width:560px){.row{flex-wrap:wrap}.row .host{flex:1 1 100%}.ping,.speed{min-width:44px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr">
+    <h1>Fobia VPN<small>проверенные конфиги для Google-сервисов из России</small></h1>
+  </div>
+  <div id="stats"></div>
+  <div class="ctrl">
+    <input id="search" type="search" placeholder="Поиск: сервер, город, название..." autocomplete="off">
+    <select id="sort">
+      <option value="rtt">по пингу</option>
+      <option value="sp">по скорости</option>
+      <option value="name">по имени</option>
+    </select>
+  </div>
+  <div class="chips" id="pchips"></div>
+  <div id="pbar" class="pbar" style="width:0"></div>
+</header>
+<main id="list"></main>
+<div id="flat"></div>
+<footer id="foot"></footer>
+<script>
+const PROTOCOLS=['hysteria2','vless','vmess','trojan','ss','tuic'];
+const PROTO_COLOR={hysteria2:'#22d3ee',vless:'#a78bfa',vmess:'#fb7185',trojan:'#fbbf24',ss:'#34d399',tuic:'#60a5fa'};
+const SVC={google:'G',gmail:'Gm',youtube:'YT',gemini:'Ge',notebooklm:'Nb',opal:'Op'};
+const CC_NAMES={RU:'Россия',DE:'Германия',FR:'Франция',NL:'Нидерланды',GB:'Великобритания',US:'США',JP:'Япония',SG:'Сингапур',HK:'Гонконг',TW:'Тайвань',KR:'Южная Корея',CN:'Китай',TR:'Турция',AE:'ОАЭ',PL:'Польша',CZ:'Чехия',UA:'Украина',BY:'Беларусь',KZ:'Казахстан',SE:'Швеция',NO:'Норвегия',FI:'Финляндия',DK:'Дания',CH:'Швейцария',AT:'Австрия',IT:'Италия',ES:'Испания',PT:'Португалия',GR:'Греция',HU:'Венгрия',RO:'Румыния',BG:'Болгария',RS:'Сербия',HR:'Хорватия',SI:'Словения',LT:'Литва',LV:'Латвия',EE:'Эстония',GE:'Грузия',AM:'Армения',AZ:'Азербайджан',MD:'Молдова',IL:'Израиль',IR:'Иран',IN:'Индия',TH:'Таиланд',ID:'Индонезия',MY:'Малайзия',PH:'Филиппины',VN:'Вьетнам',AU:'Австралия',CA:'Канада',NZ:'Новая Зеландия',BR:'Бразилия',AR:'Аргентина',MX:'Мексика',ZA:'ЮАР',IE:'Ирландия',BE:'Бельгия',LU:'Люксембург',BG:'Болгария',IS:'Исландия',MT:'Мальта',CY:'Кипр',SK:'Словакия',??:'Неизвестно'};
+const flag=cc=>{let c=cc.toUpperCase();return String.fromCodePoint(...[...c].map(x=>0x1F1E6+x.charCodeAt(0)-65))};
+const $=s=>document.querySelector(s);
+let DATA=null,flat=[],activeProto='all',searchVal='',sortMode='rtt';
+const esc=s=>s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+function serviceBadges(sv){
+  if(!sv)return '<span class="sv"></span>';
+  return '<span class="sv">'+Object.entries(SVC).map(([k,l])=>
+    '<i class="'+(sv.includes(k)?'ok':'no')+'" title="'+(sv.includes(k)?'доступен':'недоступен')+'">'+l+'</i>').join('')+'</span>';
+}
+function pingClass(r){return r==null?'u':r<100?'f':r<250?'m':'s'}
+function protoRow(c,showCc){
+  return '<div class="row"><span class="proto" style="background:'+PROTO_COLOR[c.p]+'22;color:'+PROTO_COLOR[c.p]+'">'+c.p+'</span>'+
+    '<span class="host">'+esc(c.h||'')+' <small>'+esc(c.n||'')+(showCc?' · '+flag(c.cc)+' '+c.cc:'')+'</small></span>'+
+    serviceBadges(c.sv)+
+    '<span class="ping '+pingClass(c.rtt)+'" title="Пинг (Москва)">'+((c.rtt==null)?'—':c.rtt+'мс')+'</span>'+
+    '<span class="speed" title="Скорость">'+((c.sp>0)?c.sp+'Мб/с':'')+'</span>'+
+    '<button class="cpbtn" data-link="'+esc(c.link)+'">копировать</button></div>';
+}
+function renderRows(container,list,showCc){
+  const frag=document.createDocumentFragment();
+  for(const c of list){const d=document.createElement('div');d.innerHTML=protoRow(c,showCc);frag.appendChild(d.firstChild)}
+  container.appendChild(frag);
+}
+function configsFor(cc,proto){
+  const g=DATA.countries[cc];if(!g)return[];
+  let list=proto==='all'?[]: (g[proto]||[]);
+  if(proto==='all')for(const p of PROTOCOLS)list=list.concat(g[p]||[]);
+  return sortList(list);
+}
+function sortList(list){
+  const sorted=[...list];
+  if(sortMode==='rtt')sorted.sort((a,b)=>(a.rtt??99999)-(b.rtt??99999)||b.sp-a.sp);
+  else if(sortMode==='sp')sorted.sort((a,b)=>b.sp-a.sp||(a.rtt??99999)-(b.rtt??99999));
+  else sorted.sort((a,b)=>(a.h||'').localeCompare(b.h||''));
+  return sorted;
+}
+function ensureCountry(cc,section){
+  const wrap=section.querySelector('.gbody');
+  if(wrap.dataset.ready)return;
+  wrap.dataset.ready='1';
+  const g=DATA.countries[cc];const tabs=wrap.querySelector('.ptabs');
+  tabs.innerHTML=PROTOCOLS.filter(p=>g[p]&&g[p].length).map(p=>{
+    const on=p===activeProto||activeProto==='all';
+    return '<button class="ptab'+(on?' on':'')+'" data-p="'+p+'" style="'+(on?'--dot:'+PROTO_COLOR[p]:'')+'"><span style="color:'+PROTO_COLOR[p]+'">'+p+'</span> <span class="pc">'+g[p].length+'</span></button>'
+  }).join('')||'<div class="empty">Нет конфигов</div>';
+  const body=wrap.querySelector('.rows');
+  const chosen=activeProto==='all'?PROTOCOLS.find(p=>g[p]&&g[p].length):activeProto;
+  if(chosen&&g[chosen]){
+    renderRows(body,configsFor(cc,chosen),false);
+    const count=g[chosen].length;
+    const tb=document.createElement('div');tb.className='tabbar';
+    tb.innerHTML='<span class="t">'+chosen+' · '+count+'</span><button class="cp" data-links="'+esc(g[chosen].map(x=>x.link).join('\n'))+'">копировать все</button>';
+    body.insertBefore(tb,body.firstChild);
+  }
+}
+function renderCountries(filtered){
+  const list=$('#list');list.innerHTML='';
+  const entries=Object.entries(DATA.countries).sort((a,b)=>{
+    const ta=total(a[1]),tb=total(b[1]);
+    return a[0]==='??'?1:b[0]==='??'?-1:tb-ta;
+  });
+  for(const [cc,g] of entries){
+    const t=total(g);if(t===0)continue;
+    if(filtered&&!filtered.has(cc))continue;
+    const sec=document.createElement('section');sec.className='country';sec.id='c-'+cc;
+    sec.innerHTML='<details><summary><span class="flag">'+flag(cc)+'</span><span class="nm">'+(CC_NAMES[cc]||cc)+'</span><span class="cc">'+cc+'</span><span class="cnt">'+t+'</span><span class="arr">›</span></summary>'+
+      '<div class="gbody"><div class="ptabs"></div><div class="rows"></div></div></details>';
+    list.appendChild(sec);
+    const det=sec.querySelector('details');
+    det.addEventListener('toggle',()=>{if(det.open)ensureCountry(cc,sec)});
+  }
+}
+function total(g){let n=0;for(const p of PROTOCOLS)n+=(g[p]||[]).length;return n}
+function applyProtoFilter(){
+  for(const sec of document.querySelectorAll('#list section.country')){
+    const cc=sec.id.slice(2);const g=DATA.countries[cc];
+    const n=activeProto==='all'?total(g):(g[activeProto]||[]).length;
+    sec.style.display=n?'':'none';
+    const t=sec.querySelector('summary .cnt');if(t)t.textContent=n;
+  }
+  for(const sec of document.querySelectorAll('#list section.country')){
+    const wrap=sec.querySelector('.gbody');
+    if(wrap&&wrap.dataset.ready){const rows=wrap.querySelector('.rows');rows.innerHTML='';wrap.querySelector('.ptabs').innerHTML='';delete wrap.dataset.ready;ensureCountry(sec.id.slice(2),sec)}
+  }
+}
+function searchFlat(q){
+  if(!q)return null;
+  q=q.toLowerCase();const res=[];
+  for(const [cc,g] of Object.entries(DATA.countries)){
+    for(const p of PROTOCOLS)for(const c of (g[p]||[])){
+      if((c.h||'').toLowerCase().includes(q)||(c.n||'').toLowerCase().includes(q)||cc.toLowerCase()===q){c.cc=cc;res.push(c)}
+    }
+  }
+  return sortList(res);
+}
+function showFlat(list){
+  const f=$('#flat');f.innerHTML='';
+  if(!list.length){f.innerHTML='<div class="empty">Ничего не найдено</div>';f.className='show';return}
+  f.className='show';
+  const h=document.createElement('div');h.style.cssText='max-width:980px;margin:0 auto;padding:0 14px';
+  const rows=document.createElement('div');rows.className='rows';
+  renderRows(rows,list,true);
+  h.appendChild(rows);f.appendChild(h);
+}
+function renderChips(){
+  const c=$('#pchips');
+  c.innerHTML='<button class="chip'+(activeProto==='all'?' on':'')+'" data-p="all">Все <span class="c">'+flat.length+'</span></button>'+
+    PROTOCOLS.map(p=>'<button class="chip'+(activeProto===p?' on':'')+'" data-p="'+p+'">'+p+' <span class="c">'+(flat.filter(x=>x.p===p).length)+'</span></button>').join('');
+  c.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{activeProto=b.dataset.p;renderChips();applyProtoFilter()});
+}
+function renderStats(){
+  $('#stats').innerHTML=
+    '<span>Всего: <b>'+DATA.stats.dedup+'</b></span>'+
+    '<span>Живы: <b>'+DATA.stats.alive+'</b></span>'+
+    '<span>Доступны из Москвы: <b>'+DATA.stats.moscow+'</b></span>'+
+    '<span>Прошли Google-проверку: <b>'+DATA.stats.google+'</b></span>'+
+    '<span>Стран: <b>'+Object.keys(DATA.countries).length+'</b></span>';
+  $('#foot').textContent='Обновлено: '+new Date(DATA.updated).toLocaleString('ru-RU')+' · Источники: Pawdroid, igareck, awesome-vpn, Epodonios, barry-far, Barabama, snakem982 · Конфиги проверены: TCP из Москвы, доступ к google/gmail/youtube/gemini/notebooklm/opal, пинг, скорость';
+}
+function copyText(t,btn){
+  const done=()=>{if(btn){const o=btn.textContent;btn.textContent='✓';btn.classList.add('ok');setTimeout(()=>{btn.textContent=o;btn.classList.remove('ok')},1200)}};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done).catch(()=>fallback())}
+  else fallback();
+  function fallback(){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy')}catch(e){}ta.remove();done()}
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('.cpbtn');if(b){copyText(b.dataset.link,b);return}
+  const cp=e.target.closest('.ptab');if(cp){const sec=cp.closest('section');const cc=sec.id.slice(2);const rows=sec.querySelector('.rows');rows.innerHTML='';const g=DATA.countries[cc];
+    sec.querySelectorAll('.ptab').forEach(x=>x.classList.remove('on'));
+    cp.classList.add('on');cp.style.setProperty('--dot',PROTO_COLOR[cp.dataset.p]);
+    renderRows(rows,configsFor(cc,cp.dataset.p),false);
+    const tb=document.createElement('div');tb.className='tabbar';tb.innerHTML='<span class="t">'+cp.dataset.p+' · '+g[cp.dataset.p].length+'</span><button class="cp" data-links="'+esc(g[cp.dataset.p].map(x=>x.link).join('\n'))+'">копировать все</button>';
+    rows.insertBefore(tb,rows.firstChild);return}
+  const ca=e.target.closest('.cp');if(ca)copyText(ca.dataset.links,ca);
+});
+$('#search').addEventListener('input',e=>{
+  clearTimeout($('#search')._t);
+  $('#search')._t=setTimeout(()=>{const q=e.target.value.trim();searchVal=q;
+    if(q){$('#list').style.display='none';showFlat(searchFlat(q))}
+    else{$('#flat').className='';$('#flat').innerHTML='';$('#list').style.display=''}},150);
+});
+$('#sort').addEventListener('change',e=>{sortMode=e.target.value;
+  if(searchVal){showFlat(searchFlat(searchVal));return}
+  for(const sec of document.querySelectorAll('#list section.country')){const rows=sec.querySelector('.rows');if(rows&&rows.children.length>1){const cc=sec.id.slice(2);const pt=rows.querySelector('.tabbar .t');const p=pt?pt.textContent.split('·')[0].trim():null;if(p){rows.innerHTML='';renderRows(rows,configsFor(cc,p),false);const tb=document.createElement('div');tb.className='tabbar';tb.innerHTML='<span class="t">'+p+' · '+DATA.countries[cc][p].length+'</span><button class="cp" data-links="'+esc(DATA.countries[cc][p].map(x=>x.link).join('\n'))+'">копировать все</button>';rows.insertBefore(tb,rows.firstChild)}}}
+});
+(async()=>{
+  const res=await fetch('data.json',{cache:'no-cache'});
+  DATA=await res.json();
+  for(const [cc,g] of Object.entries(DATA.countries))
+    for(const p of PROTOCOLS)for(const c of (g[p]||[])){c.cc=cc;flat.push(c)}
+  renderStats();renderChips();renderCountries();
+  const pbar=$('#pbar');pbar.style.width='100%';setTimeout(()=>pbar.style.display='none',400);
+})().catch(e=>{$('#list').innerHTML='<div class="empty">Ошибка загрузки данных: '+esc(e.message)+'</div>'});
+</script>
+</body>
+</html>

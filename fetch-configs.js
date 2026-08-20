@@ -677,7 +677,11 @@ function execFileSync_(cmd, args) {
     if (PING_LIMIT > 0) pingList = alive.slice(0, PING_LIMIT);
     console.log(`[ping] Moscow check-host.net for ${pingList.length} configs...`);
     const pingMap = await mskPingAll(pingList, 'msk');
-    mskLive = pingList.filter((c) => pingMap.has(`${c.host}:${c.port}`) && pingMap.get(`${c.host}:${c.port}`) !== null);
+    // drop only VERIFIED-unreachable from Moscow; keep checked-live and api-failed (unknown)
+    mskLive = pingList.filter((c) => {
+      const v = pingMap.get(`${c.host}:${c.port}`);
+      return v === undefined || v !== null;
+    });
     console.log(`[ping] reachable from Moscow (verified): ${mskLive.length}/${pingList.length}`);
     for (const c of pingList) c.rtt = pingMap.get(`${c.host}:${c.port}`);
   } else {

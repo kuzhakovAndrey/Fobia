@@ -373,15 +373,23 @@ async function geoIpBatch(ips) {
 // ---------------------------------------------------------------------------
 async function mskPing(hostPort) {
   let body;
-  try {
-    const r = await fetch(`https://check-host.net/check-tcp?host=${encodeURIComponent(hostPort)}&${MSK_NODES.map((n) => `node=${n}`).join('&')}`, {
-      headers: { Accept: 'application/json' },
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    body = await r.json();
-    if (process.env.DEBUG) console.log(`[dbg] POST ${hostPort} -> ${JSON.stringify(body).slice(0, 200)}`);
-  } catch (e) { if (process.env.DEBUG) console.log(`[dbg] POST ${hostPort} FAIL: ${e.message}`); return { err: true }; }
-  const reqId = body && body.request_id;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetch(`https://check-host.net/check-tcp?host=${encodeURIComponent(hostPort)}&${MSK_NODES.map((n) => `node=${n}`).join('&')}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      body = await r.json();
+      if (process.env.DEBUG) console.log(`[dbg] POST ${hostPort} -> ${JSON.stringify(body).slice(0, 200)}`);
+      break;
+    } catch (e) {
+      if (process.env.DEBUG) console.log(`[dbg] POST ${hostPort} attempt ${attempt} FAIL: ${e.message}`);
+      if (attempt === 2) return { err: true };
+      await sleep(1500 * (attempt + 1));
+    }
+  }
+  if (!body) return { err: true };
+  const reqId = body.request_id;
   if (!reqId) return { err: true };
   for (let i = 0; i < 12; i++) {
     await sleep(1500);
@@ -409,7 +417,7 @@ async function mskPingAll(items, label) {
   const concurrency = 4;
   const out = new Map();
   let idx = 0;
-  let failStreak = 0;
+  let apiFailures = 0;
   const worker = async () => {
     while (idx < items.length) {
       const i = idx++;
@@ -417,18 +425,17 @@ async function mskPingAll(items, label) {
       const hp = `${it.host}:${it.port}`;
       const r = await mskPing(hp);
       if (r.err) {
-        failStreak++;
+        apiFailures++;
         out.set(hp, null);
-        if (failStreak >= 8) { console.log(`[ping] STOP: too many consecutive errors`); idx = items.length; break; }
       } else {
-        failStreak = 0;
         out.set(hp, r.rtt);
       }
-      if ((i + 1) % 50 === 0) console.log(`[ping] ${label}: ${i + 1}/${items.length} (${countLive(out)} live)`);
-      await sleep(150);
+      if ((i + 1) % 200 === 0) console.log(`[ping] ${label}: ${i + 1}/${items.length} (${countLive(out)} live)`);
+      await sleep(120);
     }
   };
   await Promise.all(Array.from({ length: concurrency }, worker));
+  console.log(`[ping] ${label}: done, checked=${out.size}, live=${countLive(out)}, apiFailures=${apiFailures}`);
   return out;
 }
 
@@ -670,8 +677,8 @@ function execFileSync_(cmd, args) {
     if (PING_LIMIT > 0) pingList = alive.slice(0, PING_LIMIT);
     console.log(`[ping] Moscow check-host.net for ${pingList.length} configs...`);
     const pingMap = await mskPingAll(pingList, 'msk');
-    mskLive = pingList.filter((c) => pingMap.get(`${c.host}:${c.port}`) !== null);
-    console.log(`[ping] reachable from Moscow: ${mskLive.length}/${pingList.length}`);
+    mskLive = pingList.filter((c) => pingMap.has(`${c.host}:${c.port}`) && pingMap.get(`${c.host}:${c.port}`) !== null);
+    console.log(`[ping] reachable from Moscow (verified): ${mskLive.length}/${pingList.length}`);
     for (const c of pingList) c.rtt = pingMap.get(`${c.host}:${c.port}`);
   } else {
     console.log('[ping] SKIP_PING=1 — Moscow check skipped, using local TCP results');

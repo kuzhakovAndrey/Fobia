@@ -59,6 +59,8 @@ details[open] summary .arr{transform:rotate(90deg)}
 .ping{flex:none;font-size:11.5px;min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
 .port{flex:none;font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
 .row .warn{flex:none;width:17px;height:17px;border-radius:50%;background:#3a2d12;color:var(--yel);font-style:normal;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:help}
+.cpall{flex:none;border:1px solid var(--line);background:#0d131a;color:var(--mut);border-radius:6px;padding:2px 8px;font-size:13px;cursor:pointer}
+.cpall:active{color:var(--acc)}
 .ping.f{color:var(--acc)}.ping.m{color:var(--yel)}.ping.s{color:var(--red)}.ping.u{color:var(--mut)}
 .speed{flex:none;font-size:11.5px;min-width:52px;text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
 .cpbtn{flex:none;border:1px solid var(--line);background:#11181f;color:var(--tx);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer;transition:.15s}
@@ -175,7 +177,7 @@ function renderCountries(filtered){
     const t=total(g);if(t===0)continue;
     if(filtered&&!filtered.has(cc))continue;
     const sec=document.createElement('section');sec.className='country';sec.id='c-'+cc;
-    sec.innerHTML='<details><summary><span class="flag">'+flag(cc)+'</span><span class="nm">'+(CC_NAMES[cc]||cc)+'</span><span class="cc">'+cc+'</span><span class="cnt">'+t+'</span><span class="arr">›</span></summary>'+
+    sec.innerHTML='<details><summary><span class="flag">'+flag(cc)+'</span><span class="nm">'+(CC_NAMES[cc]||cc)+'</span><span class="cc">'+cc+'</span><span class="cnt">'+t+'</span><button class="cpall" data-cc="'+cc+'" title="Копировать все конфиги страны">⧉</button><span class="arr">›</span></summary>'+
       '<div class="gbody"><div class="ptabs"></div><div class="rows"></div></div></details>';
     list.appendChild(sec);
     const det=sec.querySelector('details');
@@ -242,6 +244,7 @@ function copyText(t,btn){
   function fallback(){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy')}catch(e){}ta.remove();done()}
 }
 document.addEventListener('click',e=>{
+  const all=e.target.closest('.cpall');if(all){e.preventDefault();e.stopPropagation();const cc=all.dataset.cc;copyText(configsFor(cc,'all').map(x=>x.link).join('\n'),all);return}
   const b=e.target.closest('.cpbtn');if(b){copyText(b.dataset.link,b);return}
   const cp=e.target.closest('.ptab');if(cp){const sec=cp.closest('section');const cc=sec.id.slice(2);const rows=sec.querySelector('.rows');rows.innerHTML='';const g=DATA.countries[cc];
     sec.querySelectorAll('.ptab').forEach(x=>x.classList.remove('on'));

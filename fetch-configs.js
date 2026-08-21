@@ -133,14 +133,14 @@ function parseSS(rest) {
     const dec0 = decodeB64(b64);
     if (!dec0.includes(':') && !b64.includes(':')) {
       const c = parseVless(rest);
-      if (c) { c.protocol = 'vless'; return c; }
+      if (c) { c.protocol = 'vless'; c._disguised = true; return c; }
     }
   } else {
     const dec = decodeB64(body);
     if (dec.trimStart().startsWith('{')) {
       // vmess JSON disguised as ss:// link
       const c = parseVmess(rest);
-      if (c) { c.protocol = 'vmess'; return c; }
+      if (c) { c.protocol = 'vmess'; c._disguised = true; return c; }
     }
     const at = dec.lastIndexOf('@');
     if (at < 0) return null;
@@ -242,6 +242,7 @@ function parseVmess(rest) {
     port,
     uuid: v.id,
     name: (name || v.ps || '').toString(),
+    _json: v,
     params: {
       security: v.scy || 'auto',
       type: v.net || 'tcp',
@@ -253,6 +254,40 @@ function parseVmess(rest) {
       serviceName: v.serviceName || '',
     },
   };
+}
+
+// rebuild a correct, client-parseable link (fixes pools that disguise
+// vless/vmess configs behind ss:// prefixes)
+function buildLink(c) {
+  try {
+    const q = c.params || {};
+    const name = c.name ? '#' + encodeURIComponent(c.name) : '';
+    if (c.protocol === 'vless' && c._disguised) {
+      const p = ['type=' + encodeURIComponent(q.type || 'tcp'), 'encryption=' + encodeURIComponent(q.encryption || 'none')];
+      if (q.security) p.push('security=' + encodeURIComponent(q.security));
+      if (q.sni) p.push('sni=' + encodeURIComponent(q.sni));
+      if (q.fp) p.push('fp=' + encodeURIComponent(q.fp));
+      if (q.pbk) p.push('pbk=' + encodeURIComponent(q.pbk));
+      if (q.sid) p.push('sid=' + encodeURIComponent(q.sid));
+      if (q.flow) p.push('flow=' + encodeURIComponent(q.flow));
+      if (q.host) p.push('host=' + encodeURIComponent(q.host));
+      if (q.path) p.push('path=' + encodeURIComponent(q.path));
+      if (q.alpn) p.push('alpn=' + encodeURIComponent(q.alpn));
+      if (q.headerType) p.push('headerType=' + encodeURIComponent(q.headerType));
+      if (q.serviceName) p.push('serviceName=' + encodeURIComponent(q.serviceName));
+      return 'vless://' + c.uuid + '@' + c.host + ':' + c.port + '?' + p.join('&') + name;
+    }
+    if (c.protocol === 'vmess' && c._json) {
+      const j = {
+        v: '2', ps: c.name || c._json.ps || '', add: c.host, port: String(c.port), id: c.uuid,
+        aid: String(c._json.aid != null ? c._json.aid : 0), scy: c._json.scy || 'auto',
+        net: c._json.net || 'tcp', type: c._json.type || '', host: c._json.host || '',
+        path: c._json.path || '', tls: c._json.tls || '', sni: c._json.sni || '', fp: c._json.fp || '',
+      };
+      return 'vmess://' + Buffer.from(JSON.stringify(j)).toString('base64');
+    }
+    return null;
+  } catch (e) { return null; }
 }
 
 function parseLink(link) {
@@ -661,7 +696,7 @@ function execFileSync_(cmd, args) {
   const parsed = [];
   for (const { src, link } of allRaw) {
     const c = parseLink(link);
-    if (c) { c.src = src; parsed.push(c); }
+    if (c) { c.src = src; c.raw = link; c.link = buildLink(c) || link; parsed.push(c); }
   }
   console.log(`[parse] valid: ${parsed.length}`);
 
@@ -780,7 +815,7 @@ function execFileSync_(cmd, args) {
       rtt: c.rtt ?? null,
       sp: c.speed || 0,
       sv: c.services ? Object.entries(c.services).filter(([k, v]) => v && v.ok).map(([k]) => k) : [],
-      link: c.raw,
+      link: c.link,
     });
   }
   for (const cc of Object.keys(countries)) {

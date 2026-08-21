@@ -92,7 +92,7 @@ footer{max-width:980px;margin:20px auto 0;padding:0 14px;color:var(--mut);font-s
 <div class="panel">
   <div class="chips" id="pchips"></div>
   <div class="chips" id="portchips"></div>
-  <div id="tip">Если в Happ всё «н/д»: фильтруй по порту <b>:443</b> и протоколам <b>trojan / vless / hysteria2</b> — ss/vmess чаще блокируются провайдером.</div>
+  <div id="tip">Если в Happ всё «н/д»: фильтруй по порту <b>:443</b>, протоколам <b>trojan / vless / hysteria2</b> и включай <b>✓ пинг из Москвы</b>. Готовая подписка: <button class="cpbtn" id="copysub">скопировать URL sub.txt</button></div>
 </div>
 <main id="list"></main>
 <div id="flat"></div>
@@ -104,7 +104,7 @@ const SVC={google:'G',gmail:'Gm',youtube:'YT',gemini:'Ge',notebooklm:'Nb',opal:'
 const CC_NAMES={RU:'Россия',DE:'Германия',FR:'Франция',NL:'Нидерланды',GB:'Великобритания',US:'США',JP:'Япония',SG:'Сингапур',HK:'Гонконг',TW:'Тайвань',KR:'Южная Корея',CN:'Китай',TR:'Турция',AE:'ОАЭ',PL:'Польша',CZ:'Чехия',UA:'Украина',BY:'Беларусь',KZ:'Казахстан',SE:'Швеция',NO:'Норвегия',FI:'Финляндия',DK:'Дания',CH:'Швейцария',AT:'Австрия',IT:'Италия',ES:'Испания',PT:'Португалия',GR:'Греция',HU:'Венгрия',RO:'Румыния',BG:'Болгария',RS:'Сербия',HR:'Хорватия',SI:'Словения',LT:'Литва',LV:'Латвия',EE:'Эстония',GE:'Грузия',AM:'Армения',AZ:'Азербайджан',MD:'Молдова',IL:'Израиль',IR:'Иран',IN:'Индия',TH:'Таиланд',ID:'Индонезия',MY:'Малайзия',PH:'Филиппины',VN:'Вьетнам',AU:'Австралия',CA:'Канада',NZ:'Новая Зеландия',BR:'Бразилия',AR:'Аргентина',MX:'Мексика',ZA:'ЮАР',IE:'Ирландия',BE:'Бельгия',LU:'Люксембург',BG:'Болгария',IS:'Исландия',MT:'Мальта',CY:'Кипр',SK:'Словакия','??':'Неизвестно'};
 const flag=cc=>{let c=cc.toUpperCase();return String.fromCodePoint(...[...c].map(x=>0x1F1E6+x.charCodeAt(0)-65))};
 const $=s=>document.querySelector(s);
-let DATA=null,flat=[],activeProto='all',activePort='all',searchVal='',sortMode='rtt';
+let DATA=null,flat=[],activeProto='all',activePort='all',activeMsk=false,searchVal='',sortMode='rtt';
 const esc=s=>s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const LINK_GROUPS={};
 let groupSeq=0;
@@ -141,6 +141,7 @@ function configsFor(cc,proto){
   let list=proto==='all'?[]: (g[proto]||[]);
   if(proto==='all')for(const p of PROTOCOLS)list=list.concat(g[p]||[]);
   if(activePort!=='all')list=list.filter(c=>c.pt===activePort);
+  if(activeMsk)list=list.filter(c=>c.rtt!=null);
   return sortList(list);
 }
 function sortList(list){
@@ -203,6 +204,7 @@ function searchFlat(q){
   for(const [cc,g] of Object.entries(DATA.countries)){
     for(const p of PROTOCOLS)for(const c of (g[p]||[])){
       if(activePort!=='all'&&c.pt!==activePort)continue;
+      if(activeMsk&&c.rtt==null)continue;
       if((c.h||'').toLowerCase().includes(q)||(c.n||'').toLowerCase().includes(q)||cc.toLowerCase()===q){c.cc=cc;res.push(c)}
     }
   }
@@ -224,9 +226,14 @@ function renderChips(){
   c.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{activeProto=b.dataset.p;renderChips();applyProtoFilter()});
   const ports=[...new Set(flat.map(x=>x.pt))].sort((a,b)=>a-b);
   const pc=$('#portchips');
-  pc.innerHTML='<button class="chip'+(activePort==='all'?' on':'')+'" data-port="all">порт: все</button>'+
+  pc.innerHTML='<button class="chip'+(activeMsk?' on':'')+'" data-msk="1">✓ пинг из Москвы <span class="c">'+(flat.filter(x=>x.rtt!=null).length)+'</span></button>'+
+    '<button class="chip'+(activePort==='all'?' on':'')+'" data-port="all">порт: все</button>'+
     ports.map(p=>'<button class="chip'+(activePort===p?' on':'')+'" data-port="'+p+'">:'+p+' <span class="c">'+(flat.filter(x=>x.pt===p).length)+'</span></button>').join('');
-  pc.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{activePort=b.dataset.port==='all'?'all':parseInt(b.dataset.port,10);renderChips();applyProtoFilter();const q=searchVal;if(q)showFlat(searchFlat(q))});
+  pc.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
+    if(b.dataset.msk){activeMsk=!activeMsk}
+    else activePort=b.dataset.port==='all'?'all':parseInt(b.dataset.port,10);
+    renderChips();applyProtoFilter();const q=searchVal;if(q)showFlat(searchFlat(q));
+  });
 }
 function renderStats(){
   $('#stats').innerHTML=
@@ -264,6 +271,7 @@ $('#sort').addEventListener('change',e=>{sortMode=e.target.value;
   for(const sec of document.querySelectorAll('#list section.country')){const rows=sec.querySelector('.rows');if(rows&&rows.children.length>1){const cc=sec.id.slice(2);const pt=rows.querySelector('.tabbar .t');const p=pt?pt.textContent.split('·')[0].trim():null;if(p){rows.innerHTML='';renderRows(rows,configsFor(cc,p),false);rows.insertBefore(htmlEl(copyGroupBtn(configsFor(cc,p).map(x=>x.link),p+' · '+configsFor(cc,p).length)),rows.firstChild)}}}
 });
 (async()=>{
+  $('#copysub').addEventListener('click',()=>copyText(location.origin+location.pathname.replace(/index\.html$/,'')+'sub.txt',$('#copysub')));
   const res=await fetch('data.json',{cache:'no-cache'});
   DATA=await res.json();
   for(const [cc,g] of Object.entries(DATA.countries))

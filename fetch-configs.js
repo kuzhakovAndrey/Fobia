@@ -275,6 +275,7 @@ function buildLink(c) {
       if (q.alpn) p.push('alpn=' + encodeURIComponent(q.alpn));
       if (q.headerType) p.push('headerType=' + encodeURIComponent(q.headerType));
       if (q.serviceName) p.push('serviceName=' + encodeURIComponent(q.serviceName));
+      if (q.insecure === '1' || q.allowInsecure === '1' || q.allow_insecure === '1') p.push('allowInsecure=1');
       return 'vless://' + c.uuid + '@' + c.host + ':' + c.port + '?' + p.join('&') + name;
     }
     if (c.protocol === 'vmess' && c._json) {
@@ -481,29 +482,34 @@ async function mskPing(hostPort) {
 }
 
 async function mskPingAll(items, label) {
-  const concurrency = 4;
   const out = new Map();
-  let idx = 0;
-  let apiFailures = 0;
-  const worker = async () => {
-    while (idx < items.length) {
-      const i = idx++;
-      const it = items[i];
-      const hp = `${it.host}:${it.port}`;
-      const r = await mskPing(hp);
-      if (r.err) {
-        apiFailures++;
-        out.set(hp, null);
-      } else {
-        out.set(hp, r.rtt);
+  async function pass(list, conc, gap, tag) {
+    let idx = 0;
+    const worker = async () => {
+      while (idx < list.length) {
+        const i = idx++;
+        const it = list[i];
+        const hp = `${it.host}:${it.port}`;
+        const r = await mskPing(hp);
+        out.set(hp, r.err ? 'err' : r.rtt);
+        if ((i + 1) % 200 === 0) console.log(`[ping] ${label}${tag}: ${i + 1}/${list.length}`);
+        await sleep(gap);
       }
-      if ((i + 1) % 200 === 0) console.log(`[ping] ${label}: ${i + 1}/${items.length} (${countLive(out)} live)`);
-      await sleep(120);
-    }
-  };
-  await Promise.all(Array.from({ length: concurrency }, worker));
-  console.log(`[ping] ${label}: done, checked=${out.size}, live=${countLive(out)}, apiFailures=${apiFailures}`);
-  return out;
+    };
+    await Promise.all(Array.from({ length: conc }, () => worker()));
+  }
+  await pass(items, 4, 120, '');
+  const failed = items.filter((it) => out.get(`${it.host}:${it.port}`) === 'err');
+  if (failed.length) {
+    console.log(`[ping] retrying ${failed.length} unresolved checks...`);
+    await sleep(5000);
+    await pass(failed, 2, 400, '/retry');
+  }
+  const res = new Map();
+  for (const [k, v] of out) res.set(k, v === 'err' ? null : v);
+  const live = [...res.values()].filter((v) => v !== null).length;
+  console.log(`[ping] ${label}: done, checked=${res.size}, live=${live}, unreachableOrUnknown=${res.size - live}`);
+  return res;
 }
 
 function countLive(map) { let n = 0; for (const v of map.values()) if (v !== null) n++; return n; }
@@ -793,6 +799,13 @@ function execFileSync_(cmd, args) {
   // final
   const finalList = configs.filter((c) => c.proxyOk);
   console.log(`[final] configs passing all checks: ${finalList.length}`);
+
+  // best-of subscription for Happ: Moscow-verified + port 443 + DPI-resistant protocols
+  const bestOf = finalList.filter((c) => c.rtt != null && c.port === 443 && ['vless', 'trojan', 'hysteria2'].includes(c.protocol));
+  const subList = bestOf.length >= 10 ? bestOf : finalList.filter((c) => c.rtt != null);
+  const subContent = (subList.length ? subList : finalList).map((c) => c.link).join('\n') + '\n';
+  fs.writeFileSync(path.join(SCRIPT_DIR, 'sub.txt'), subContent);
+  console.log(`[sub] best-of subscription: ${subList.length} configs`);
 
   // country hint + name
   for (const c of finalList) {

@@ -61,6 +61,7 @@ details[open] summary .arr{transform:rotate(90deg)}
 .ping{flex:none;font-size:11.5px;min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
 .port{flex:none;font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
 .row .warn{flex:none;width:17px;height:17px;border-radius:50%;background:#3a2d12;color:var(--yel);font-style:normal;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:help}
+.row .rl{flex:none;font-style:normal;font-size:13px;color:var(--yel);cursor:help}
 .cpall{flex:none;border:1px solid var(--line);background:#0d131a;color:var(--mut);border-radius:6px;padding:2px 8px;font-size:13px;cursor:pointer}
 .cpall:active{color:var(--acc)}
 .ping.f{color:var(--acc)}.ping.m{color:var(--yel)}.ping.s{color:var(--red)}.ping.u{color:var(--mut)}
@@ -99,7 +100,7 @@ footer{max-width:980px;margin:20px auto 0;padding:0 14px;color:var(--mut);font-s
 <div class="panel">
   <div class="chips" id="pchips"></div>
   <div class="chips" id="portchips"></div>
-  <div id="tip">Если в Happ всё «н/д»: фильтруй по порту <b>:443</b>, протоколам <b>trojan / vless / hysteria2</b> и включай <b>✓ пинг из Москвы</b>. Готовая подписка: <button class="cpbtn" id="copysub">скопировать URL sub.txt</button></div>
+  <div id="tip">В РФ надёжнее всего <b>⚡ VLESS+TCP+Reality</b> (ws/ss/trojan DPI часто режет после рукопожатия). Фильтруй: ⚡ Reality + ✓ пинг из Москвы. Готовая подписка — только Reality: <button class="cpbtn" id="copysub">скопировать URL sub.txt</button></div>
 </div>
 <main id="list"></main>
 <div id="flat"></div>
@@ -111,7 +112,7 @@ const SVC={google:'G',gmail:'Gm',youtube:'YT',gemini:'Ge',notebooklm:'Nb',opal:'
 const CC_NAMES={RU:'Россия',DE:'Германия',FR:'Франция',NL:'Нидерланды',GB:'Великобритания',US:'США',JP:'Япония',SG:'Сингапур',HK:'Гонконг',TW:'Тайвань',KR:'Южная Корея',CN:'Китай',TR:'Турция',AE:'ОАЭ',PL:'Польша',CZ:'Чехия',UA:'Украина',BY:'Беларусь',KZ:'Казахстан',SE:'Швеция',NO:'Норвегия',FI:'Финляндия',DK:'Дания',CH:'Швейцария',AT:'Австрия',IT:'Италия',ES:'Испания',PT:'Португалия',GR:'Греция',HU:'Венгрия',RO:'Румыния',BG:'Болгария',RS:'Сербия',HR:'Хорватия',SI:'Словения',LT:'Литва',LV:'Латвия',EE:'Эстония',GE:'Грузия',AM:'Армения',AZ:'Азербайджан',MD:'Молдова',IL:'Израиль',IR:'Иран',IN:'Индия',TH:'Таиланд',ID:'Индонезия',MY:'Малайзия',PH:'Филиппины',VN:'Вьетнам',AU:'Австралия',CA:'Канада',NZ:'Новая Зеландия',BR:'Бразилия',AR:'Аргентина',MX:'Мексика',ZA:'ЮАР',IE:'Ирландия',BE:'Бельгия',LU:'Люксембург',BG:'Болгария',IS:'Исландия',MT:'Мальта',CY:'Кипр',SK:'Словакия','??':'Неизвестно'};
 const flag=cc=>{let c=cc.toUpperCase();return String.fromCodePoint(...[...c].map(x=>0x1F1E6+x.charCodeAt(0)-65))};
 const $=s=>document.querySelector(s);
-let DATA=null,flat=[],activeProto='all',activePort='all',activeMsk=false,searchVal='',sortMode='rtt';
+let DATA=null,flat=[],activeProto='all',activePort='all',activeMsk=false,activeRl=false,searchVal='',sortMode='rtt';
 const esc=s=>s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const LINK_GROUPS={};
 let groupSeq=0;
@@ -129,9 +130,11 @@ function serviceBadges(sv){
 function pingClass(r){return r==null?'u':r<100?'f':r<250?'m':'s'}
 function protoRow(c,showCc){
   const warn=(c.p==='ss'||c.p==='vmess'||c.p==='tuic')?'<i class="warn" title="Может не поддерживаться Happ">!</i>':'';
+  const rl=c.rl?'<i class="rl" title="VLESS+TCP+Reality — лучше всего проходит блокировки в РФ">⚡</i>':'';
   return '<div class="row"><span class="proto" style="background:'+PROTO_COLOR[c.p]+'22;color:'+PROTO_COLOR[c.p]+'">'+c.p+'</span>'+
     '<span class="host">'+esc(c.h||'')+' <small>'+esc(c.n||'')+(showCc?' · '+flag(c.cc)+' '+c.cc:'')+'</small></span>'+
     serviceBadges(c.sv)+
+    rl+
     '<span class="port">:'+c.pt+'</span>'+
     '<span class="ping '+pingClass(c.rtt)+'" title="Пинг (Москва)">'+((c.rtt==null)?'—':c.rtt+'мс')+'</span>'+
     '<span class="speed" title="Скорость">'+((c.sp>0)?c.sp+'Мб/с':'')+'</span>'+
@@ -149,6 +152,7 @@ function configsFor(cc,proto){
   if(proto==='all')for(const p of PROTOCOLS)list=list.concat(g[p]||[]);
   if(activePort!=='all')list=list.filter(c=>c.pt===activePort);
   if(activeMsk)list=list.filter(c=>c.rtt!=null);
+  if(activeRl)list=list.filter(c=>c.rl);
   return sortList(list);
 }
 function sortList(list){
@@ -212,6 +216,7 @@ function searchFlat(q){
     for(const p of PROTOCOLS)for(const c of (g[p]||[])){
       if(activePort!=='all'&&c.pt!==activePort)continue;
       if(activeMsk&&c.rtt==null)continue;
+      if(activeRl&&!c.rl)continue;
       if((c.h||'').toLowerCase().includes(q)||(c.n||'').toLowerCase().includes(q)||cc.toLowerCase()===q){c.cc=cc;res.push(c)}
     }
   }
@@ -233,11 +238,13 @@ function renderChips(){
   c.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{activeProto=b.dataset.p;renderChips();applyProtoFilter()});
   const ports=[...new Set(flat.map(x=>x.pt))].sort((a,b)=>a-b);
   const pc=$('#portchips');
-  pc.innerHTML='<button class="chip'+(activeMsk?' on':'')+'" data-msk="1">✓ пинг из Москвы <span class="c">'+(flat.filter(x=>x.rtt!=null).length)+'</span></button>'+
+  pc.innerHTML='<button class="chip'+(activeRl?' on':'')+'" data-rl="1">⚡ Reality <span class="c">'+(flat.filter(x=>x.rl).length)+'</span></button>'+
+    '<button class="chip'+(activeMsk?' on':'')+'" data-msk="1">✓ пинг из Москвы <span class="c">'+(flat.filter(x=>x.rtt!=null).length)+'</span></button>'+
     '<button class="chip'+(activePort==='all'?' on':'')+'" data-port="all">порт: все</button>'+
     ports.map(p=>'<button class="chip'+(activePort===p?' on':'')+'" data-port="'+p+'">:'+p+' <span class="c">'+(flat.filter(x=>x.pt===p).length)+'</span></button>').join('');
   pc.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
-    if(b.dataset.msk){activeMsk=!activeMsk}
+    if(b.dataset.msk)activeMsk=!activeMsk;
+    else if(b.dataset.rl)activeRl=!activeRl;
     else activePort=b.dataset.port==='all'?'all':parseInt(b.dataset.port,10);
     renderChips();applyProtoFilter();const q=searchVal;if(q)showFlat(searchFlat(q));
   });

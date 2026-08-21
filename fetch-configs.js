@@ -801,8 +801,9 @@ function execFileSync_(cmd, args) {
   console.log(`[final] configs passing all checks: ${finalList.length}`);
 
   // best-of subscription for Happ: Moscow-verified + port 443 + DPI-resistant protocols
+  const reality = finalList.filter((c) => c.rtt != null && c.rl);
   const bestOf = finalList.filter((c) => c.rtt != null && c.port === 443 && ['vless', 'trojan', 'hysteria2'].includes(c.protocol));
-  const subList = bestOf.length >= 10 ? bestOf : finalList.filter((c) => c.rtt != null);
+  const subList = reality.length >= 10 ? reality : bestOf.length >= 10 ? bestOf : finalList.filter((c) => c.rtt != null);
   const subContent = (subList.length ? subList : finalList).map((c) => c.link).join('\n') + '\n';
   fs.writeFileSync(path.join(SCRIPT_DIR, 'sub.txt'), subContent);
   console.log(`[sub] best-of subscription: ${subList.length} configs`);
@@ -812,6 +813,8 @@ function execFileSync_(cmd, args) {
     if (!c.country) c.country = '??';
     const hint = hostnameCountryHint(c.host);
     if (hint) c.country = hint;
+    // VLESS+TCP+Reality — the only family reliably passing RU DPI
+    c.rl = (c.protocol === 'vless' && (c.params.security === 'reality') && ((c.params.type || 'tcp') === 'tcp')) ? 1 : 0;
   }
 
   // build data.json
@@ -826,6 +829,7 @@ function execFileSync_(cmd, args) {
       h: c.host,
       pt: c.port,
       rtt: c.rtt ?? null,
+      rl: c.rl || 0,
       sp: c.speed || 0,
       sv: c.services ? Object.entries(c.services).filter(([k, v]) => v && v.ok).map(([k]) => k) : [],
       link: c.link,

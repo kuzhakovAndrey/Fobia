@@ -24,6 +24,8 @@ h1 small{display:block;font-size:11px;font-weight:400;color:var(--mut)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .panel{max-width:980px;margin:0 auto;padding:10px 14px 0}
 .panel .chips:first-child{margin-top:0}
+.updrow{display:flex;gap:8px;align-items:center;margin-top:7px;font-size:12px;color:var(--mut);flex-wrap:wrap}
+.updrow a{color:var(--mut);font-size:11px}
 #tip{font-size:11px;color:var(--mut);margin-top:8px;background:#10151c;border:1px solid var(--line);border-radius:8px;padding:7px 10px}
 #tip b{color:var(--tx)}
 .chip{border:1px solid var(--line);background:#0d131a;color:var(--mut);border-radius:999px;padding:4px 11px;font-size:12px;cursor:pointer;user-select:none;transition:.15s}
@@ -88,6 +90,11 @@ footer{max-width:980px;margin:20px auto 0;padding:0 14px;color:var(--mut);font-s
     </select>
   </div>
   <div id="pbar" class="pbar" style="width:0"></div>
+  <div class="updrow">
+    <button class="cpbtn" id="updnow">⟳ обновить сейчас</button>
+    <span id="updstat"></span>
+    <a href="#" id="tokset" title="Токен GitHub с правом Actions:write — тогда кнопка запускает сборку прямо отсюда">токен</a>
+  </div>
 </header>
 <div class="panel">
   <div class="chips" id="pchips"></div>
@@ -272,6 +279,37 @@ $('#sort').addEventListener('change',e=>{sortMode=e.target.value;
 });
 (async()=>{
   $('#copysub').addEventListener('click',()=>copyText(location.origin+location.pathname.replace(/index\.html$/,'')+'sub.txt',$('#copysub')));
+  const REPO='kuzhakovAndrey/Fobia';
+  let lastRunStatus=null;
+  async function pollRun(){
+    try{
+      const r=await fetch('https://api.github.com/repos/'+REPO+'/actions/runs?per_page=1',{headers:{Accept:'application/vnd.github+json'}});
+      if(!r.ok)return;
+      const j=await r.json();
+      const run=j.workflow_runs&&j.workflow_runs[0];
+      if(!run)return;
+      const s=run.status;
+      const ago=Math.max(0,Math.round((Date.now()-new Date(run.run_started_at||run.created_at))/60000));
+      const el=$('#updstat');
+      if(s==='completed') el.textContent=(run.conclusion==='success'?'✓ готово':'⚠ ошибка сборки')+' · '+ago+' мин назад';
+      else el.textContent='⏳ идёт сборка ('+(s==='in_progress'?'работает':'в очереди')+')';
+      if(lastRunStatus&&lastRunStatus!=='completed'&&s==='completed'&&run.conclusion==='success')setTimeout(()=>location.reload(),2500);
+      lastRunStatus=s;
+    }catch(e){}
+  }
+  $('#updnow').addEventListener('click',()=>{
+    const tok=localStorage.getItem('fobia_token');
+    if(!tok){window.open('https://github.com/'+REPO+'/actions/workflows/pages.yml','_blank');return}
+    $('#updstat').textContent='запускаю…';
+    fetch('https://api.github.com/repos/'+REPO+'/actions/workflows/pages.yml/dispatches',{method:'POST',headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify({ref:'main'})}).then(r=>{
+      $('#updstat').textContent=r.status===204?'✓ сборка запущена':'недостаточно прав ('+r.status+')';
+    }).catch(()=>{$('#updstat').textContent='сетевая ошибка'});
+  });
+  $('#tokset').addEventListener('click',e=>{e.preventDefault();
+    const t=prompt('GitHub токен (fine-grained, только репозиторий Fobia, право Actions: Write).\nВставь один раз — сохранится локально в браузере. Пусто и OK — удалить сохранённый.');
+    if(t!==null){t.trim()?localStorage.setItem('fobia_token',t.trim()):localStorage.removeItem('fobia_token')}
+  });
+  setInterval(pollRun,60000);pollRun();
   const res=await fetch('data.json',{cache:'no-cache'});
   DATA=await res.json();
   for(const [cc,g] of Object.entries(DATA.countries))

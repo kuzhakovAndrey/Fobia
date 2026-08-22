@@ -1,0 +1,67 @@
+name: Build and Deploy (sharded)
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 */2 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Fetch + ping + proxy test (shard ${{ matrix.shard }})
+        env:
+          SHARD_INDEX: ${{ matrix.shard }}
+          SHARD_COUNT: 4
+        run: node fetch-configs.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}
+          path: |
+            .shard-${{ matrix.shard }}.json
+            .stats.json
+          if-no-files-found: error
+  merge-and-deploy:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          path: shards
+          pattern: shard-*
+      - name: Merge shards
+        env:
+          MERGE_DIR: shards
+        run: node fetch-configs.js
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp data.json _site/
+          cp sub.txt _site/ 2>/dev/null || true
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4

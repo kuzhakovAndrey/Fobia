@@ -12,6 +12,9 @@ const PING_LIMIT = parseInt(process.env.PING_LIMIT || '0', 10);
 const PROXY_LIMIT = parseInt(process.env.PROXY_LIMIT || '1500', 10);
 const TCP_TIMEOUT = parseInt(process.env.TCP_TIMEOUT || '2500', 10);
 const SING_BOX_BIN = process.env.SING_BOX_BIN || path.join(SCRIPT_DIR, 'sing-box');
+const SHARD_INDEX = parseInt(process.env.SHARD_INDEX || '0', 10);
+const SHARD_COUNT = parseInt(process.env.SHARD_COUNT || '1', 10);
+const MERGE_DIR = process.env.MERGE_DIR || '';
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'fobia-'));
 
 const SOURCES = [
@@ -612,7 +615,8 @@ async function proxyTest(c) {
       if (k === 'google' && !r) break;
     }
     let speed = 0;
-    if (services.google && services.google.ok) {
+    const passed = MANDATORY.every((k) => services[k] && services[k].ok);
+    if (passed) {
       const sp = await new Promise((res) => {
         execFile('curl', ['-sS', '-o', '/dev/null', '-w', '%{speed_download}', '--max-time', '12', '--range', '0-3145727', '-x', proxy, 'https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb'], { timeout: 15000 }, (err, stdout) => {
           const v = parseFloat(stdout.trim());
@@ -621,7 +625,7 @@ async function proxyTest(c) {
       });
       speed = sp;
     }
-    const ok = MANDATORY.every((k) => services[k] && services[k].ok);
+    const ok = passed;
     if (process.env.DEBUG && !ok) {
       const log = fs.existsSync(path.join(TMP, `sb-${port}.log`)) ? fs.readFileSync(path.join(TMP, `sb-${port}.log`), 'utf8').slice(-600) : '';
       console.log(`[dbg] FAIL ${c.protocol} ${c.host}:${c.port} svc=${JSON.stringify(services)} log=${log.replace(/\n/g, ' | ')}`);
@@ -634,7 +638,7 @@ async function proxyTest(c) {
 }
 
 async function proxyTestAll(items, label) {
-  const concurrency = Math.min(12, items.length || 1);
+  const concurrency = Math.min(parseInt(process.env.PROXY_CONC || '32', 10), items.length || 1);
   const results = [];
   let idx = 0;
   const worker = async () => {
@@ -677,8 +681,72 @@ function execFileSync_(cmd, args) {
 // ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
+function serialize(c) {
+  return {
+    n: (c.name || '').slice(0, 60),
+    p: c.protocol,
+    h: c.host,
+    pt: c.port,
+    rtt: c.rtt ?? null,
+    rl: (c.protocol === 'vless' && c.params.security === 'reality' && ((c.params.type || 'tcp') === 'tcp')) ? 1 : 0,
+    sp: c.speed || 0,
+    sv: c.services ? Object.entries(c.services).filter(([k, v]) => v && v.ok).map(([k]) => k) : [],
+    link: c.link,
+    c: (() => { if (!c.country) c.country = '??'; const hint = hostnameCountryHint(c.host); if (hint) c.country = hint; return c.country; })(),
+  };
+}
+
 (async () => {
   const t0 = Date.now();
+
+  // MERGE mode: collect shard outputs, rebuild data.json + sub.txt, exit
+  if (MERGE_DIR) {
+    const files = fs.readdirSync(MERGE_DIR).filter((f) => f.startsWith('.shard-') && f.endsWith('.json')).sort();
+    const all = [];
+    for (const f of files) {
+      const part = JSON.parse(fs.readFileSync(path.join(MERGE_DIR, f), 'utf8'));
+      console.log(`[merge] ${f}: ${part.length} passed`);
+      for (const c of part) all.push(c);
+    }
+    // dedup by protocol+host+port
+    const seen = new Set();
+    const finalList = [];
+    for (const c of all) {
+      const k = `${c.p}|${c.h}|${c.pt}`;
+      if (!seen.has(k)) { seen.add(k); finalList.push(c); }
+    }
+    console.log(`[merge] total passed: ${finalList.length}`);
+    const countries = {};
+    for (const c of finalList) {
+      const cc = c.c || '??';
+      if (!countries[cc]) countries[cc] = {};
+      if (!countries[cc][c.p]) countries[cc][c.p] = [];
+      countries[cc][c.p].push(c);
+    }
+    for (const cc of Object.keys(countries)) {
+      for (const proto of Object.keys(countries[cc])) {
+        countries[cc][proto].sort((a, b) => (a.rtt ?? 99999) - (b.rtt ?? 99999) || b.sp - a.sp);
+      }
+    }
+    // sub.txt: reality-first best-of
+    let subList = finalList.filter((c) => c.rl);
+    if (subList.length < 10) subList = finalList.filter((c) => c.pt === 443 && ['vless', 'trojan', 'hysteria2'].includes(c.p));
+    if (subList.length < 10) subList = finalList;
+    fs.writeFileSync(path.join(SCRIPT_DIR, 'sub.txt'), subList.map((c) => c.link).join('\n') + '\n');
+    const statsFile = path.join(MERGE_DIR, '.stats.json');
+    const stats = fs.existsSync(statsFile) ? JSON.parse(fs.readFileSync(statsFile, 'utf8')) : {};
+    const data = {
+      updated: new Date().toISOString(),
+      sources: stats.sources || {},
+      stats: stats.stats || { google: finalList.length },
+      countries,
+    };
+    fs.writeFileSync(path.join(SCRIPT_DIR, 'data.json'), JSON.stringify(data));
+    const dt = ((Date.now() - t0) / 1000).toFixed(0);
+    console.log(`[done] merge ${dt}s, countries: ${Object.keys(countries).length}, configs: ${finalList.length}`);
+    process.exit(0);
+  }
+
   const sourceCount = {};
   const allRaw = [];
   console.log('[fetch] downloading sources...');
@@ -763,7 +831,9 @@ function execFileSync_(cmd, args) {
   let mskLive = alive;
   if (process.env.SKIP_PING !== '1') {
     if (PING_LIMIT > 0) pingList = alive.slice(0, PING_LIMIT);
-    console.log(`[ping] Moscow check-host.net for ${pingList.length} configs...`);
+    // shard: this job tests only its slice of the list
+    if (SHARD_COUNT > 1) pingList = pingList.filter((_, i) => i % SHARD_COUNT === SHARD_INDEX);
+    console.log(`[ping] Moscow check-host.net for ${pingList.length} configs (shard ${SHARD_INDEX}/${SHARD_COUNT})...`);
     const pingMap = await mskPingAll(pingList, 'msk');
     // drop only VERIFIED-unreachable from Moscow; keep checked-live and api-failed (unknown)
     mskLive = pingList.filter((c) => {
@@ -775,6 +845,7 @@ function execFileSync_(cmd, args) {
   } else {
     console.log('[ping] SKIP_PING=1 — Moscow check skipped, using local TCP results');
   }
+  const mskLiveAll = SHARD_COUNT > 1 ? alive.length : mskLive.length;
 
   // proxy test
   let testList = mskLive;
@@ -794,6 +865,26 @@ function execFileSync_(cmd, args) {
     }
     const passed = testList.filter((c) => c.proxyOk);
     console.log(`[proxy] google-pass: ${passed.length}/${testList.length}`);
+    // shard mode: dump shard result and exit; merge job assembles the site
+    if (SHARD_COUNT > 1 && !MERGE_DIR) {
+      const shardOut = path.join(SCRIPT_DIR, `.shard-${SHARD_INDEX}.json`);
+      fs.writeFileSync(shardOut, JSON.stringify(testList.filter((c) => c.proxyOk).map(serialize)));
+      console.log(`[shard] wrote ${shardOut} (${testList.filter((c) => c.proxyOk).length} passed)`);
+      if (SHARD_INDEX === 0) {
+        fs.writeFileSync(path.join(SCRIPT_DIR, '.stats.json'), JSON.stringify({
+          sources: sourceCount,
+          stats: {
+            fetched: allRaw.length,
+            parsed: parsed.length,
+            dedup: configs.length,
+            alive: alive.length,
+            moscow: mskLiveAll,
+            google: -1,
+          },
+        }));
+      }
+      process.exit(0);
+    }
   }
 
   // final

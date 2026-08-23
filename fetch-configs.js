@@ -701,10 +701,18 @@ function serialize(c) {
 
   // MERGE mode: collect shard outputs, rebuild data.json + sub.txt, exit
   if (MERGE_DIR) {
-    const files = fs.readdirSync(MERGE_DIR).filter((f) => f.startsWith('shard-') && f.endsWith('.json')).sort();
+    const files = [];
+    (function walk(dir) {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) walk(p);
+        else if (e.name.startsWith('shard-') && e.name.endsWith('.json')) files.push(p);
+      }
+    })(MERGE_DIR);
+    files.sort();
     const all = [];
     for (const f of files) {
-      const part = JSON.parse(fs.readFileSync(path.join(MERGE_DIR, f), 'utf8'));
+      const part = JSON.parse(fs.readFileSync(f, 'utf8'));
       console.log(`[merge] ${f}: ${part.length} passed`);
       for (const c of part) all.push(c);
     }
@@ -733,8 +741,15 @@ function serialize(c) {
     if (subList.length < 10) subList = finalList.filter((c) => c.pt === 443 && ['vless', 'trojan', 'hysteria2'].includes(c.p));
     if (subList.length < 10) subList = finalList;
     fs.writeFileSync(path.join(SCRIPT_DIR, 'sub.txt'), subList.map((c) => c.link).join('\n') + '\n');
-    const statsFile = path.join(MERGE_DIR, 'stats.json');
-    const stats = fs.existsSync(statsFile) ? JSON.parse(fs.readFileSync(statsFile, 'utf8')) : {};
+    const statsFile = files.length ? path.join(path.dirname(files[0]), '..', 'stats.json') : '';
+    const stats = (statsFile && fs.existsSync(statsFile)) ? JSON.parse(fs.readFileSync(statsFile, 'utf8'))
+      : (() => { // stats.json lives inside a shard-N subfolder
+        for (const f of files) {
+          const p = path.join(path.dirname(f), 'stats.json');
+          if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+        }
+        return {};
+      })();
     const data = {
       updated: new Date().toISOString(),
       sources: stats.sources || {},

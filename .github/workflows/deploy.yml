@@ -34,8 +34,8 @@ jobs:
         with:
           name: shard-${{ matrix.shard }}
           path: |
-            .shard-${{ matrix.shard }}.json
-            .stats.json
+            shard-${{ matrix.shard }}.json
+            stats.json
           if-no-files-found: error
   merge-and-deploy:
     needs: shard
